@@ -1,0 +1,52 @@
+services:
+
+  postgres:
+    image: ghcr.io/stac-utils/pgstac:latest
+    environment:
+      POSTGRES_USER: username
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: postgis
+    ports:
+      - "5431:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U username -d postgis"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # Jednorazowy serwis ładujący schemat pgSTAC do bazy. Celowo osobny
+  # od "postgres" i od "app" - jeśli migracja padnie, widać to od razu
+  # jako osobny, czerwony krok w `docker compose up`
+  pgstac-migrate:
+    image: python:3.12-slim
+    command: >
+      bash -c "pip install --no-cache-dir 'pypgstac[psycopg]==0.9.*' &&
+               pypgstac migrate"
+    environment:
+      PGHOST: postgres
+      PGPORT: 5432
+      PGUSER: username
+      PGPASSWORD: password
+      PGDATABASE: postgis
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  app:
+    build:
+      context: .
+      dockerfile: docker/app.Dockerfile
+    environment:
+      DATABASE_URL: postgresql://username:password@postgres:5432/postgis
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      pgstac-migrate:
+        condition: service_completed_successfully
+
+volumes:
+  pgdata:
