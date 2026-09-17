@@ -3,7 +3,9 @@ import asyncpg
 from satellite_catalog.settings import settings
 
 # Pula połączeń trzymana jako stan modułu, tworzona/zamykana w lifespanie
-# aplikacji FastAPI (main.py)
+# aplikacji FastAPI (main.py). Prostota na Kroku 0 - jeśli w przyszłości
+# będzie potrzeba łatwiejszego mockowania w testach, przeniesiemy to na
+# app.state.
 _pool: asyncpg.Pool | None = None
 
 
