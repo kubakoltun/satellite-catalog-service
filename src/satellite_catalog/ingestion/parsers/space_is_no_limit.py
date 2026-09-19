@@ -38,7 +38,7 @@ logger = logging.getLogger(__name__)
 _NS = {"se": "http://spaceisnolimit.com/schemas/metadata/v2"}
 
 
-def parse_space_eye(raw: bytes | str) -> STACItemDict:
+def parse_space_is_no_limit(raw: bytes | str) -> STACItemDict:
     """Mapuje surowy XML SPACE_EYE na zwalidowany STAC Item."""
     root = _load_xml(raw)
 

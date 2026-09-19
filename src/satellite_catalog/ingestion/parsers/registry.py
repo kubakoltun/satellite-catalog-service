@@ -15,8 +15,8 @@ from dataclasses import dataclass
 from satellite_catalog.core.mission import Mission
 from satellite_catalog.core.stac_models import STACItemDict
 from satellite_catalog.ingestion.errors import UnsupportedMissionError
-from satellite_catalog.ingestion.parsers.sky_shield_json import parse_sky_shield
-from satellite_catalog.ingestion.parsers.space_eye_xml import parse_space_eye
+from satellite_catalog.ingestion.parsers.sky_is_no_limit import parse_sky_is_no_limit
+from satellite_catalog.ingestion.parsers.space_is_no_limit import parse_space_is_no_limit
 
 
 @dataclass(frozen=True)
@@ -26,8 +26,8 @@ class _ParserEntry:
 
 
 _REGISTRY: dict[Mission, _ParserEntry] = {
-    Mission.SKY_SHIELD: _ParserEntry(Mission.SKY_SHIELD, parse_sky_shield),
-    Mission.SPACE_EYE: _ParserEntry(Mission.SPACE_EYE, parse_space_eye),
+    Mission.SKY_SHIELD: _ParserEntry(Mission.SKY_SHIELD, parse_sky_is_no_limit),
+    Mission.SPACE_EYE: _ParserEntry(Mission.SPACE_EYE, parse_space_is_no_limit),
 }
 
 

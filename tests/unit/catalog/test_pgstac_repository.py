@@ -11,7 +11,7 @@ from satellite_catalog.catalog.errors import (
 )
 from satellite_catalog.catalog.pgstac_repository import PgstacRepository
 from satellite_catalog.core.mission import Mission
-from satellite_catalog.ingestion.parsers.sky_shield_json import parse_sky_shield
+from satellite_catalog.ingestion.parsers.sky_is_no_limit import parse_sky_is_no_limit
 from tests.unit.catalog.fakes import FakeConnection, FakePool
 
 
@@ -21,7 +21,7 @@ def sky_shield_item():
         (__import__("pathlib").Path(__file__).parents[2] / "fixtures" / "sky_shield_sample.json")
         .read_text()
     )
-    return parse_sky_shield(raw)
+    return parse_sky_is_no_limit(raw)
 
 
 async def test_ensure_collection_calls_upsert_collection_with_payload():

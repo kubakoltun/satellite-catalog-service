@@ -31,7 +31,7 @@ from satellite_catalog.ingestion.errors import ParsingError
 logger = logging.getLogger(__name__)
 
 
-def parse_sky_shield(raw: bytes | str) -> STACItemDict:
+def parse_sky_is_no_limit(raw: bytes | str) -> STACItemDict:
     """Mapuje surowy JSON SKY_SHIELD na zwalidowany STAC Item."""
     data = _load_json(raw)
 

@@ -26,7 +26,7 @@ import pytest
 from satellite_catalog.catalog.collections import build_collection
 from satellite_catalog.catalog.pgstac_repository import PgstacRepository
 from satellite_catalog.core.mission import Mission
-from satellite_catalog.ingestion.parsers.sky_shield_json import parse_sky_shield
+from satellite_catalog.ingestion.parsers.sky_is_no_limit import parse_sky_is_no_limit
 
 pytestmark = pytest.mark.integration
 
@@ -69,7 +69,7 @@ async def test_save_item_persists_to_pgstac(pool: asyncpg.Pool) -> None:
     repo = PgstacRepository(pool)
     await repo.ensure_collection(build_collection(Mission.SKY_SHIELD))
 
-    item = parse_sky_shield(FIXTURE.read_text())
+    item = parse_sky_is_no_limit(FIXTURE.read_text())
     await repo.save_item(item)
 
     async with pool.acquire() as conn:
@@ -86,7 +86,7 @@ async def test_save_item_is_idempotent(pool: asyncpg.Pool) -> None:
     repo = PgstacRepository(pool)
     await repo.ensure_collection(build_collection(Mission.SKY_SHIELD))
 
-    item = parse_sky_shield(FIXTURE.read_text())
+    item = parse_sky_is_no_limit(FIXTURE.read_text())
     await repo.save_item(item)
     await repo.save_item(item)  # ten sam Item, drugi raz
 
@@ -104,7 +104,7 @@ async def test_search_finds_saved_item_by_bbox_and_cloud_cover(pool: asyncpg.Poo
     repo = PgstacRepository(pool)
     await repo.ensure_collection(build_collection(Mission.SKY_SHIELD))
 
-    item = parse_sky_shield(FIXTURE.read_text())
+    item = parse_sky_is_no_limit(FIXTURE.read_text())
     await repo.save_item(item)
 
     result = await repo.search(
@@ -126,7 +126,7 @@ async def test_search_excludes_item_when_cloud_cover_filter_too_strict(
     repo = PgstacRepository(pool)
     await repo.ensure_collection(build_collection(Mission.SKY_SHIELD))
 
-    item = parse_sky_shield(FIXTURE.read_text())
+    item = parse_sky_is_no_limit(FIXTURE.read_text())
     await repo.save_item(item)
 
     result = await repo.search(
