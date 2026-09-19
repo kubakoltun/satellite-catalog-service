@@ -1,24 +1,9 @@
-"""Implementacja `CatalogRepositoryPort` oparta o funkcje SQL pgSTAC.
+"""Implementation of `CatalogRepositoryPort` based on pgSTAC SQL functions.
 
-Celowo NIE piszemy surowego SQL-a operującego bezpośrednio na tabelach
-`pgstac.items`/`pgstac.collections` - są partycjonowane i mają nietrywialną
-logikę wewnętrzną (m.in. automatyczne partycjonowanie po czasie, triggery
-utrzymujące indeksy). Zamiast tego wywołujemy oficjalne funkcje SQL, które
-pgSTAC do tego udostępnia w schemacie `pgstac` (ten sam mechanizm, którego
-pod spodem używa `pypgstac`).
-
-UWAGA (do zweryfikowania przy pierwszym realnym uruchomieniu): nazwy
-`pgstac.upsert_collection` / `pgstac.upsert_item` / `pgstac.search`
-odpowiadają publicznemu API pgSTAC w wersji, na którą wskazuje
-`docker-compose.yml`. Jeśli po podniesieniu `docker compose up` zapis lub
-wyszukiwanie zwróci błąd "function ... does not exist", sprawdź dokładne
-nazwy funkcji w załadowanym schemacie:
-
-    docker compose exec postgres psql -U username -d postgis -c "\\df pgstac.*"
-
-i podmień wywołanie SQL poniżej na właściwą nazwę - kontrakt
-`CatalogRepositoryPort` (save_item/ensure_collection/search) się nie
-zmienia, więc żaden kod poza tym plikiem nie wymaga wtedy modyfikacji.
+We deliberately do not write raw SQL that operates directly on the `pgstac.items`/`pgstac.collections` tables, 
+as they are partitioned and have non-trivial internal logic, 
+including automatic time-based partitioning and triggers that maintain indexes. 
+Instead, we use the official SQL functions provided by pgSTAC in the 'pgstac' schema.
 """
 
 from __future__ import annotations
@@ -49,10 +34,10 @@ class PgstacRepository:
                 await conn.execute("SELECT pgstac.upsert_collection($1::jsonb);", payload)
         except asyncpg.PostgresError as exc:
             raise CollectionPersistenceError(
-                f"Nie udało się zarejestrować kolekcji '{collection.get('id')}': {exc}"
+                f"Did not manage to register the collection '{collection.get('id')}': {exc}"
             ) from exc
 
-        logger.info("Kolekcja '%s' zarejestrowana/zaktualizowana.", collection.get("id"))
+        logger.info("Collection '%s' register/updated.", collection.get("id"))
 
     async def save_item(self, item: STACItemDict) -> None:
         payload = json.dumps(item)
@@ -61,12 +46,12 @@ class PgstacRepository:
                 await conn.execute("SELECT pgstac.upsert_item($1::jsonb);", payload)
         except asyncpg.PostgresError as exc:
             raise ItemPersistenceError(
-                f"Nie udało się zapisać Itemu '{item.get('id')}' "
+                f"Did not manage to save Item '{item.get('id')}' "
                 f"(collection='{item.get('collection')}'): {exc}"
             ) from exc
 
         logger.info(
-            "Item '%s' zapisany do kolekcji '%s'.", item.get("id"), item.get("collection")
+            "Item '%s' saved to collection '%s'.", item.get("id"), item.get("collection")
         )
 
     async def search(self, search_body: dict) -> dict:
@@ -75,7 +60,7 @@ class PgstacRepository:
             async with self._pool.acquire() as conn:
                 raw = await conn.fetchval("SELECT * FROM pgstac.search($1::jsonb);", payload)
         except asyncpg.PostgresError as exc:
-            raise SearchError(f"Wyszukiwanie w katalogu nie powiodło się: {exc}") from exc
+            raise SearchError(f"searching in the catalog did not succeed: {exc}") from exc
 
         # `pgstac.search` zwraca kolumnę typu jsonb; asyncpg (bez dodatkowego
         # codeca) oddaje ją jako string JSON, nie dict - trzeba go dociąć.

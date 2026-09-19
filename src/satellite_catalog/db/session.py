@@ -15,6 +15,9 @@ async def create_pool() -> asyncpg.Pool:
         dsn=settings.database_url,
         min_size=1,
         max_size=5,
+        server_settings={
+            "search_path": settings.database_search_path
+        }
     )
     return _pool
 

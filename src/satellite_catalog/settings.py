@@ -2,17 +2,25 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    """Konfiguracja aplikacji, czytana ze zmiennych środowiskowych / pliku .env.
-
-    Na razie (Krok 0) potrzebujemy tylko połączenia do bazy danych.
-    Kolejne pola (np. konfiguracja brokera) dojdą wraz z kolejnymi krokami.
-    """
-
-    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
-
-    database_url: str = (
-        "postgresql://username:password@localhost:5432/postgis"
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        extra="ignore",
     )
 
+    pguser: str = "username"
+    pgpassword: str = "password"
+    pghost: str = "localhost"
+    pgport: int = 5432
+    pgdatabase: str = "postgis"
+
+    database_search_path: str = "pgstac,public"
+
+    @property
+    def database_url(self) -> str:
+        return (
+            f"postgresql://{self.pguser}:{self.pgpassword}"
+            f"@{self.pghost}:{self.pgport}/{self.pgdatabase}"
+        )
 
 settings = Settings()

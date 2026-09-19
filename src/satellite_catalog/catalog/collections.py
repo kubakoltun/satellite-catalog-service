@@ -1,16 +1,19 @@
-"""Definicje STAC Collection dla obsługiwanych misji.
+"""STAC Collection definitions for operated missions.
 
-pgSTAC wymaga, żeby Collection istniała w bazie zanim wstawisz do niej
-jakikolwiek Item (klucz obcy `collection` w tabeli items). Te dwie
-kolekcje są statyczne (znamy je już teraz - SKY_SHIELD, SPACE_EYE),
-więc nie ma potrzeby dynamicznego tworzenia kolekcji "w locie" przy
-ingestion - są rejestrowane raz, jawnie, przy starcie aplikacji.
+pgSTAC requires created Collection in the database before inserting any Item (FK of 'collection' table).
+Therefore, I am inserting a two static collections - known two missions: SKY_SHIELD, SPACE_EYE.
+The assumption is that I will always know about the mission ahead of time. So there is no need to create
+the collections dynamically. 
 
-Zasięg przestrzenny/czasowy kolekcji celowo jest maksymalnie szeroki
-([-180,-90,180,90], interval [None, None]) - kolekcja reprezentuje całą
-misję, nie pojedynczą scenę, a jej faktyczny zasięg rośnie z każdym
-zaingestowanym Itemem. Zawężanie go teraz "na sztywno" byłoby fałszywą
-precyzją.
+Range of the spatial-temporal extent is intentionally broad:
+([-180, -90, 180, 90], interval [None, None]).
+
+The Collection represents the entire mission, it's actual extent depends on the
+Items ingested into it. It may expand as new Items are added.
+
+At application startup, the exact extent is not yet known. Using a narrower extent
+would imply having specific information about the range. Therefore, the Collection
+metadata would give a false sense of precision. The extent is updated as Items are ingested.
 """
 
 from __future__ import annotations
@@ -29,21 +32,20 @@ _MISSION_METADATA: dict[Mission, dict[str, str]] = {
     Mission.SKY_SHIELD: {
         "title": "SKY_SHIELD",
         "description": (
-            "Zobrazowania optyczne wielospektralne z misji SKY_SHIELD, "
-            "dostarczane przez SkyIsNoLimit."
+            "Multispectral optical imagery from the SKY_SHIELD mission, provided by SkyIsNoLimit."
         ),
     },
     Mission.SPACE_EYE: {
         "title": "SPACE_EYE",
         "description": (
-            "Zobrazowania z misji SPACE_EYE, dostarczane przez SpaceIsNoLimit."
+            "Imagery from the SPACE_EYE mission, provided by SpaceIsNoLimit."
         ),
     },
 }
 
 
 def build_collection(mission: Mission) -> dict:
-    """Buduje i waliduje STAC Collection dla podanej misji."""
+    """Building a validating a STAC Collection for given mission."""
     meta = _MISSION_METADATA[mission]
 
     collection = {
@@ -57,10 +59,10 @@ def build_collection(mission: Mission) -> dict:
         "links": [],
     }
 
-    Collection.model_validate(collection)  # rzuci przy niezgodności ze spec
+    Collection.model_validate(collection)  # throws if it does not match the spec
     return collection
 
 
 def default_collections() -> list[dict]:
-    """Wszystkie kolekcje, które muszą istnieć w katalogu przy starcie aplikacji."""
+    """Every collections that need to exist in the catalog on app start-up."""
     return [build_collection(mission) for mission in Mission]

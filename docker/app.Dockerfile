@@ -2,8 +2,8 @@ FROM python:3.12-slim
 
 WORKDIR /app
 
-# Zależności instalujemy przed skopiowaniem kodu źródłowego, żeby Docker
-# mógł cache'ować tę warstwę między buildami dopóki pyproject.toml się nie zmienia.
+# dependencies are installed before coping source code, so that docker may cache betweend builds
+# until pyproject.toml stays the same
 COPY pyproject.toml ./
 COPY src ./src
 

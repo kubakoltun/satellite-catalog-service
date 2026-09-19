@@ -1,14 +1,14 @@
 class CatalogError(Exception):
-    """Bazowy wyjątek dla błędów warstwy przechowywania/wyszukiwania."""
+    """Base exception for errors at the storage-search layer"""
 
 
 class ItemPersistenceError(CatalogError):
-    """Zapis Itemu do katalogu się nie powiódł (błąd bazy danych)."""
+    """Saving an Item to the catalog did not succeede (data basse error)."""
 
 
 class CollectionPersistenceError(CatalogError):
-    """Zapis/rejestracja Collection w katalogu się nie powiodła."""
+    """Saving/registering Collection in the catalog did not succeede."""
 
 
 class SearchError(CatalogError):
-    """Wyszukiwanie w katalogu się nie powiodło (błąd bazy danych)."""
+    """Searchin the catalog did not succeede (data basse error)."""

@@ -1,12 +1,12 @@
-"""Budowa zapytania do `pgstac.search()` z filtrów przekazanych w `/search`.
+"""Builds the query for `pgstac.search()` from filters passed to `/search`.
 
-Rozdzielenie budowy zapytania (ten moduł, same czyste funkcje) od jego
-wykonania (`PgstacRepository.search`) jest świadome - to jest dokładnie
-ta część, w której najłatwiej o literówkę w nazwie operatora czy
-przestawioną kolejność `bbox`, więc warto móc to testować bez bazy danych.
+Separating query construction (this module, consisting only of pure functions)
+from query execution (PgstacRepository.search) is intentional. It is easy 
+to make a typo in an operator name or get the bbox ordering wrong, 
+so it is useful to be able to test it without a database.
 
-Format wynikowego "search body" to STAC API Item Search request body
-(rozszerzenie `query`) - dokładnie to, czego oczekuje `pgstac.search()`.
+The resulting "search body" follows the STAC API Item Search request body format
+(with the query extension) - exactly what pgstac.search() expects.
 """
 
 from __future__ import annotations
@@ -26,10 +26,9 @@ class SearchFilters:
 
 
 def parse_bbox_param(bbox: str | None) -> tuple[float, float, float, float] | None:
-    """Parsuje `bbox=minLon,minLat,maxLon,maxLat` (format STAC API).
+    """Parses `bbox=minLon,minLat,maxLon,maxLat` (STAC API format).
 
-    Podnosi `ValueError` przy niepoprawnym formacie - warstwa API mapuje
-    to na 400, nie na 500 z głębi zapytania do bazy.
+    Raises `ValueError` for an invalid format - API layer maps to 400.
     """
     if bbox is None:
         return None
@@ -37,21 +36,21 @@ def parse_bbox_param(bbox: str | None) -> tuple[float, float, float, float] | No
     parts = bbox.split(",")
     if len(parts) != 4:
         raise ValueError(
-            f"bbox musi mieć dokładnie 4 wartości (minLon,minLat,maxLon,maxLat), otrzymano: {bbox!r}"
+            f"bbox has to have exactly 4 values (minLon,minLat,maxLon,maxLat), got: {bbox!r}"
         )
     try:
         min_lon, min_lat, max_lon, max_lat = (float(p) for p in parts)
     except ValueError as exc:
-        raise ValueError(f"bbox zawiera niepoprawną liczbę: {exc}") from exc
+        raise ValueError(f"bbox contains a invalid number: {exc}") from exc
 
     if min_lon > max_lon or min_lat > max_lat:
-        raise ValueError(f"bbox: wartości minimalne muszą być <= maksymalnym: {bbox!r}")
+        raise ValueError(f"bbox: minimum values must be less than or equal to maximum values: {bbox!r}")
 
     return (min_lon, min_lat, max_lon, max_lat)
 
 
 def parse_collections_param(collections: str | None) -> tuple[str, ...] | None:
-    """Parsuje `collections=SKY_SHIELD,SPACE_EYE` na krotkę nazw kolekcji."""
+    """Parses `collections=SKY_SHIELD,SPACE_EYE` into a tuple of collection names."""
     if collections is None:
         return None
     parsed = tuple(c.strip() for c in collections.split(",") if c.strip())
@@ -59,17 +58,18 @@ def parse_collections_param(collections: str | None) -> tuple[str, ...] | None:
 
 
 def validate_datetime_param(value: str | None) -> str | None:
-    """Waliduje parametr `datetime` w formacie STAC API: pojedynczy
-    RFC3339 instant, albo interwał `start/end` (z `..` jako otwartym
-    końcem). Zwraca wejście bez zmian (pgSTAC sam je sparsuje) - to jest
-    tylko wczesna, czytelna walidacja formatu.
+    """Validates the `datetime` parameter in STAC API format: a single
+    RFC3339 instant or an interval `start/end` (with `..` representing
+    an open end).
+    Returns the input unchanged (`pgSTAC` parses it itself) - this is only
+    early, readable format validation.
     """
     if value is None:
         return None
 
     parts = value.split("/")
     if len(parts) not in (1, 2):
-        raise ValueError(f"Niepoprawny format datetime (oczekiwano instant lub start/end): {value!r}")
+        raise ValueError(f"Invalid format datetime (expected instant or start/end): {value!r}")
 
     for part in parts:
         if part == "..":
@@ -84,11 +84,11 @@ def _validate_rfc3339_instant(value: str) -> None:
     try:
         _datetime.fromisoformat(normalized)
     except ValueError as exc:
-        raise ValueError(f"Niepoprawna data/czas w formacie RFC3339: {value!r}") from exc
+        raise ValueError(f"Invalid data/time in RFC3339 format: {value!r}") from exc
 
 
 def build_pgstac_search_body(filters: SearchFilters) -> dict:
-    """Składa search body zgodne z tym, czego oczekuje `pgstac.search()`."""
+    """Search body, the format is compatible with `pgstac.search()` filters."""
     body: dict = {"limit": filters.limit}
 
     if filters.bbox is not None:
