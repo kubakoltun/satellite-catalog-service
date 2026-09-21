@@ -1,12 +1,20 @@
 from pathlib import Path
 
 import pytest
+import base64
+import json
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
+from unittest.mock import AsyncMock, Mock
 
+from satellite_catalog.core.mission import Mission
+from satellite_catalog.ingestion.errors import ParsingError
+from satellite_catalog.ingestion.worker import _handle_message
 from satellite_catalog.deps import get_repository
+from satellite_catalog.deps import get_queue
 from satellite_catalog.ingestion.api import router as ingestion_router
 from tests.unit.fakes import FakeCatalogRepository
+from tests.unit.fakes import FakeQueue
 
 FIXTURES = Path(__file__).parents[2] / "fixtures"
 
@@ -15,11 +23,16 @@ FIXTURES = Path(__file__).parents[2] / "fixtures"
 def fake_repository() -> FakeCatalogRepository:
     return FakeCatalogRepository()
 
+@pytest.fixture
+def fake_queue() -> FakeQueue:
+    return FakeQueue()
+
 
 @pytest.fixture
-def client(fake_repository: FakeCatalogRepository) -> TestClient:
+def client(fake_repository: FakeCatalogRepository, fake_queue: FakeQueue) -> TestClient:
     app = FastAPI()
     app.include_router(ingestion_router)
+    app.dependency_overrides[get_queue] = lambda: fake_queue
     app.dependency_overrides[get_repository] = lambda: fake_repository
     return TestClient(app)
 
@@ -35,33 +48,6 @@ def test_ingest_sky_shield_returns_202_immediately(client: TestClient) -> None:
     assert response.json() == {"status": "accepted", "mission": "SKY_SHIELD"}
 
 
-def test_ingest_sky_shield_saves_item_via_background_task(
-    client: TestClient, fake_repository: FakeCatalogRepository
-) -> None:
-    # Starlette wykonuje BackgroundTasks jako część tego samego cyklu
-    # ASGI, więc po powrocie z client.post() zadanie w tle już się
-    # zakończyło - można to sprawdzić bez sleep()/pollingu.
-    raw = (FIXTURES / "sky_shield_sample.json").read_bytes()
-
-    client.post("/ingest/SKY_SHIELD", content=raw)
-
-    assert len(fake_repository.saved_items) == 1
-    assert fake_repository.saved_items[0]["id"] == "SKY_SHIELD_20260824_091522_L1C_POL"
-
-
-def test_ingest_space_eye_saves_item_via_background_task(
-    client: TestClient, fake_repository: FakeCatalogRepository
-) -> None:
-    raw = (FIXTURES / "space_eye_sample.xml").read_bytes()
-
-    client.post(
-        "/ingest/SPACE_EYE", content=raw, headers={"Content-Type": "application/xml"}
-    )
-
-    assert len(fake_repository.saved_items) == 1
-    assert fake_repository.saved_items[0]["id"] == "SE02_L2A_20260824T104500_N001"
-
-
 def test_ingest_unknown_mission_rejected_by_path_validation(client: TestClient) -> None:
     response = client.post("/ingest/UNKNOWN_MISSION", content=b"{}")
 
@@ -72,16 +58,39 @@ def test_ingest_empty_body_returns_400(client: TestClient) -> None:
     response = client.post("/ingest/SKY_SHIELD", content=b"")
 
     assert response.status_code == 400
+    assert response.json() == {"detail": "Request body is empty"}
 
 
-def test_ingest_invalid_payload_does_not_save_anything(
-    client: TestClient, fake_repository: FakeCatalogRepository, caplog: pytest.LogCaptureFixture
+@pytest.mark.asyncio
+async def test_invalid_payload_is_dead_lettered(
+    caplog: pytest.LogCaptureFixture,
 ) -> None:
-    # Zły JSON - endpoint i tak zwraca 202 (błąd wykryje się dopiero w tle),
-    # ale nic nie powinno wylądować w repozytorium, a błąd ma trafić do logów.
-    with caplog.at_level("ERROR"):
-        response = client.post("/ingest/SKY_SHIELD", content=b"{not valid json")
+    body = json.dumps(
+        {
+            "mission": Mission.SKY_SHIELD.value,
+            "raw": base64.b64encode(b"{not valid json").decode("ascii"),
+            "message_id": "test-message-id",
+            "received_at": "2026-01-01T00:00:00+00:00",
+        }
+    ).encode()
 
-    assert response.status_code == 202
-    assert fake_repository.saved_items == []
-    assert any("Błąd parsowania" in record.message for record in caplog.records)
+    message = Mock()
+    message.body = body
+    message.ack = AsyncMock()
+    message.nack = AsyncMock()
+
+    service = Mock()
+    service.ingest = AsyncMock(side_effect=ParsingError("Invalid JSON"))
+
+    with caplog.at_level("ERROR", logger="satellite_catalog.worker"):
+        await _handle_message(message, service)
+
+    message.nack.assert_awaited_once_with(requeue=False)
+    message.ack.assert_not_awaited()
+
+    service.ingest.assert_awaited_once_with(
+        Mission.SKY_SHIELD,
+        b"{not valid json",
+    )
+
+    assert any("Unrecoverable ingestion error" in record.message for record in caplog.records)

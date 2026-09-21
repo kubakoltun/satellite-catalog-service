@@ -10,6 +10,7 @@ Ten fake jest jeden poziom wyżej - udaje cały port `CatalogRepositoryPort`.
 from __future__ import annotations
 
 from satellite_catalog.core.stac_models import STACItemDict
+from satellite_catalog.core.mission import Mission
 
 
 class FakeCatalogRepository:
@@ -28,3 +29,13 @@ class FakeCatalogRepository:
     async def search(self, search_body: dict) -> dict:
         self.last_search_body = search_body
         return self.search_result
+
+
+class FakeQueue:
+    def __init__(self) -> None:
+        self.missions: list[Mission] = []
+        self.raw: list[dict] = []
+
+    async def publish(self, mission: Mission, raw: bytes) -> None:
+        self.missions = mission
+        self.raw = raw

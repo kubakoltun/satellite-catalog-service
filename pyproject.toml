@@ -23,6 +23,7 @@ dev = [
 ]
 integration = [
     "testcontainers[postgres]>=4.7",
+    "pypgstac",
 ]
 
 [tool.pytest.ini_options]
