@@ -8,34 +8,33 @@ from satellite_catalog.catalog.collections import default_collections
 from satellite_catalog.catalog.pgstac_repository import PgstacRepository
 from satellite_catalog.db.session import check_connection, close_pool, create_pool, get_pool
 from satellite_catalog.ingestion.api import router as ingestion_router
+from satellite_catalog.ingestion.rabbitmq_queue import RabbitMQQueue
+from satellite_catalog.settings import settings
 
 logger = logging.getLogger("satellite_catalog")
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Connection pool created once on app startup, not per request.
-    # It is the only place where something persists across requests.
     await create_pool()
     logger.info("Connected to the database.")
 
-    # Repository created once and stored in app.state.
-    # Endpoints (search_router, ingestion_router) get it through
-    # Depends(get_repository) (satellite_catalog.deps), so they never
-    # import PgstacRepository directly.
     repository = PgstacRepository(get_pool())
     app.state.repository = repository
 
-    # Collections must exist in pgSTAC before any Item can be inserted
-    # because of the foreign key constraint. Registration is idempotent
-    # (upsert), so it is safe to run on every application startup.
     for collection in default_collections():
         await repository.ensure_collection(collection)
-    logger.info("STAC collection registered.")
+    logger.info("STAC collections registered.")
+
+    queue = await RabbitMQQueue.connect(settings.rabbitmq_url)
+    app.state.queue = queue
+    logger.info("Connected to RabbitMQ.")
 
     yield
+
+    await queue.close()
     await close_pool()
-    logger.info("Closed the database connection.")
+    logger.info("Closed the database and RabbitMQ connections.")
 
 
 app = FastAPI(
@@ -51,11 +50,6 @@ app.include_router(search_router)
 
 @app.get("/health", tags=["system"])
 async def health() -> dict[str, str]:
-    """Check whether the app is up and the database is reachable
-
-    The purpose of the health check is to verify the entire pipeline
-    (app <-> Postgres/pgSTAC).
-    """
     try:
         await check_connection()
     except Exception as exc:  # noqa: BLE001 - health check should catch all

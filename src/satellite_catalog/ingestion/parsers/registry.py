@@ -36,5 +36,5 @@ def get_parser(mission: Mission) -> Callable[[bytes | str], STACItemDict]:
     """
     entry = _REGISTRY.get(mission)
     if entry is None:
-        raise UnsupportedMissionError(f"Brak parsera dla misji: {mission}")
+        raise UnsupportedMissionError(f"No parser for mission: {mission}")
     return entry.parse

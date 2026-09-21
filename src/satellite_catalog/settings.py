@@ -16,11 +16,21 @@ class Settings(BaseSettings):
 
     database_search_path: str = "pgstac,public"
 
+    rabbitmq_user: str = "guest"
+    rabbitmq_password: str = "guest"
+    rabbitmq_host: str = "localhost"
+    rabbitmq_port: int = 5672
+
     @property
     def database_url(self) -> str:
         return (
             f"postgresql://{self.pguser}:{self.pgpassword}"
             f"@{self.pghost}:{self.pgport}/{self.pgdatabase}"
         )
+
+    @property
+    def rabbitmq_url(self) -> str:
+        return f"amqp://{self.rabbitmq_user}:{self.rabbitmq_password}@{self.rabbitmq_host}:{self.rabbitmq_port}/"
+
 
 settings = Settings()

@@ -16,3 +16,7 @@ class ParsingError(IngestionError):
     that the resulting STAC Item does not conform to the STAC specification.
     Validation is handled by `stac_models.validate_stac_item`.
     """
+
+
+class QueuePublishError(IngestionError):
+    """Broker did not confirm the persistence of a published message."""

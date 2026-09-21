@@ -33,6 +33,17 @@ services:
       postgres:
         condition: service_healthy
 
+  rabbitmq:
+    image: rabbitmq:3.13-management
+    ports:
+      - "5672:5672"
+      - "15672:15672"  # management UI: http://localhost:15672 (guest/guest)
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
   app:
     build:
       context: .
@@ -43,6 +54,10 @@ services:
       PGHOST: postgres
       PGPORT: 5432
       PGDATABASE: ${PGDATABASE}
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USER: guest
+      RABBITMQ_PASSWORD: guest
     ports:
       - "8000:8000"
     depends_on:
@@ -50,6 +65,39 @@ services:
         condition: service_healthy
       pgstac-migrate:
         condition: service_completed_successfully
+      rabbitmq:
+        condition: service_healthy
+
+  worker:
+    build:
+      context: .
+      dockerfile: docker/worker.Dockerfile
+    environment:
+      PGUSER: ${PGUSER}
+      PGPASSWORD: ${PGPASSWORD}
+      PGHOST: postgres
+      PGPORT: 5432
+      PGDATABASE: ${PGDATABASE}
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USER: guest
+      RABBITMQ_PASSWORD: guest
+    depends_on:
+      postgres:
+        condition: service_healthy
+      pgstac-migrate:
+        condition: service_completed_successfully
+      rabbitmq:
+        condition: service_healthy
+    # scale for throughput: docker compose up --scale worker=3
+
+  mock-satellite:
+    build:
+      context: .
+      dockerfile: docker/mock-satellite.Dockerfile
+    depends_on:
+      - app
+    profiles: ["mock"]  # opt-in: docker compose --profile mock up
 
 volumes:
   pgdata:

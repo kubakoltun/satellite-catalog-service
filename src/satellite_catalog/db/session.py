@@ -1,6 +1,7 @@
 import asyncpg
 
 from satellite_catalog.settings import settings
+from contextlib import asynccontextmanager
 
 # The connection pool is kept as module-level state. It is created and closed
 # during the FastAPI application lifespan.
@@ -44,3 +45,19 @@ async def check_connection() -> None:
         result = await conn.fetchval("SELECT 1;")
         if result != 1:
             raise RuntimeError("Unexpected answer from the database")
+
+
+@asynccontextmanager
+async def worker_db_pool():
+    """Async context manager wrapping create_pool/close_pool for worker.py.
+
+    The worker is its own process/container, entirely separate from
+    FastAPI's lifespan, so it needs its own entry point into the same
+    pool-creation logic - this is that second caller, scoped to the
+    worker's own lifetime instead of an ASGI app's.
+    """
+    pool = await create_pool()
+    try:
+        yield pool
+    finally:
+        await close_pool()
