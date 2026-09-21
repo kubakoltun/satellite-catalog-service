@@ -1,7 +1,7 @@
 services:
 
   postgres:
-    image: ghcr.io/stac-utils/pgstac:0.9.12
+    image: ghcr.io/stac-utils/pgstac:v0.9.11
     environment:
       POSTGRES_USER: ${PGUSER}
       POSTGRES_PASSWORD: ${PGPASSWORD}

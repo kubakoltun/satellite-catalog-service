@@ -9,6 +9,8 @@ zapisuje w Postgres+pgSTAC i udostępnia przez
 
 ## Szybki start
 
+Uruchom poniższe polecenia z katalogu głównego repozytorium.
+
 ### 1. Przygotuj konfigurację
 
 Projekt korzysta ze zmiennych środowiskowych zapisanych w pliku .env.

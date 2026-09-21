@@ -8,7 +8,7 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
-    pguser: str = "username"
+    pguser: str = "postgres"
     pgpassword: str = "password"
     pghost: str = "localhost"
     pgport: int = 5432

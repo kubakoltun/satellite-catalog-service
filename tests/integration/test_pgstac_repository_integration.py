@@ -37,7 +37,7 @@ def pgstac_dsn():
 
     container = (
         DockerContainer("ghcr.io/stac-utils/pgstac:latest")
-        .with_env("POSTGRES_USER", "username")
+        .with_env("POSTGRES_USER", "postgres")
         .with_env("POSTGRES_PASSWORD", "password")
         .with_env("POSTGRES_DB", "postgis")
         .with_exposed_ports(5432)
@@ -46,7 +46,7 @@ def pgstac_dsn():
         wait_for_logs(running, "database system is ready to accept connections", timeout=60)
         host = running.get_container_host_ip()
         port = running.get_exposed_port(5432)
-        dsn = f"postgresql://username:password@{host}:{port}/postgis"
+        dsn = f"postgresql://postgres:password@{host}:{port}/postgis"
 
         subprocess.run(["pypgstac", "migrate", "--dsn", dsn], check=True)
         yield dsn
