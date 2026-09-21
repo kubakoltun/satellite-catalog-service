@@ -2,10 +2,11 @@ from enum import Enum
 
 
 class Mission(str, Enum):
-    """Misje obsługiwane przez katalog.
+    """Missions supported by the catalog
 
-    Wartość enuma = nazwa kolekcji STAC, do której trafiają Itemy tej misji
-    (`collection` w wynikowym STAC Item odpowiada wprost tej wartości).
+    Each enum value corresponds to the name of a STAC Collection
+    containing Items for that mission. The `collection` field of
+    the resulting STAC Item will contain one of these values.
     """
 
     SKY_SHIELD = "SKY_SHIELD"

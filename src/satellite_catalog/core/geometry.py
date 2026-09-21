@@ -1,9 +1,10 @@
-"""Operacje geoprzestrzenne wspólne dla obu parserów.
+"""Geospatial operations shared by both parsers
 
-STAC wymaga geometrii i bbox w WGS84 (EPSG:4326) - niezależnie od tego,
-w jakim układzie dostawca opisuje footprint. SKY_SHIELD dostarcza dane
-już w EPSG:4326 (nic do zrobienia poza walidacją), SPACE_EYE w UTM 34N
-(EPSG:32634) - wymaga realnej reprojekcji, nie tylko przepisania liczb.
+STAC requires the geometry and bbox to be in WGS84 (EPSG:4326), regardless of the CRS 
+used by the provider to describe the footprint. 
+SKY_SHIELD already provides data in EPSG:4326 (nothing to do except validation), 
+while SPACE_EYE uses UTM 34N (EPSG:32634) and therefore 
+requires an actual reprojection.
 """
 
 from __future__ import annotations
@@ -14,14 +15,15 @@ from shapely.ops import transform
 from shapely.wkt import loads as wkt_loads
 from pyproj import Transformer
 
-_COORD_PRECISION = 6  # ~11 cm na równiku - więcej niż potrzeba, mniej niż szum GPS
+_COORD_PRECISION = 6  # ~11 cm at the equator; finer than the expected footprint accuracy
 
 
 def reproject_wkt_to_wgs84(wkt: str, source_epsg: str) -> dict:
-    """Zamienia geometrię WKT w dowolnym CRS na GeoJSON w EPSG:4326.
+    """Reprojects a WKT geometry from the source CRS to WGS84 (EPSG:4326)
+    and returns it as GeoJSON.
 
-    `source_epsg` w formacie "EPSG:32634" (dokładnie tak, jak przychodzi
-    w metadanych SPACE_EYE).
+    `source_epsg` must be in the format "EPSG:32634", exactly as provided
+    in the SPACE_EYE metadata.
     """
     geometry: BaseGeometry = wkt_loads(wkt)
 
@@ -32,7 +34,7 @@ def reproject_wkt_to_wgs84(wkt: str, source_epsg: str) -> dict:
 
 
 def bbox_from_geometry(geometry: dict) -> tuple[float, float, float, float]:
-    """Liczy bbox (minx, miny, maxx, maxy) z geometrii GeoJSON w WGS84."""
+    """Calculates the bbox (minx, miny, maxx, maxy) from a GeoJSON geometry in WGS84."""
     minx, miny, maxx, maxy = shape(geometry).bounds
     return (
         round(minx, _COORD_PRECISION),
@@ -47,17 +49,17 @@ def bbox_matches(
     reference: tuple[float, float, float, float],
     tolerance_deg: float = 0.01,
 ) -> bool:
-    """Porównuje przeliczony bbox z bboxem podanym wprost przez dostawcę.
+    """Compares a calculated bbox with the bbox provided directly by the provider
 
-    Używane jako sanity-check po reprojekcji (np. SPACE_EYE podaje
-    `GlobalBBOX` niezależnie od `FootprintWKT`) - nie jako źródło prawdy,
-    tylko jako wczesne ostrzeżenie, gdyby reprojekcja poszła nie tak.
+    Used as a sanity check after reprojection. SPACE_EYE provides `GlobalBBOX`
+    independently of `FootprintWKT`. It is not treated as the source of truth,
+    but rather as an early warning if the reprojection goes wrong.
     """
     return all(abs(a - b) <= tolerance_deg for a, b in zip(computed, reference, strict=True))
 
 
 def _round_geojson(geometry: dict) -> dict:
-    """Zaokrągla współrzędne w geometrii GeoJSON (dowolnego typu) do stałej precyzji."""
+    """Rounds coordinates in a GeoJSON geometry of any type to a fixed precision."""
 
     def _round_coords(coords):
         if isinstance(coords[0], (int, float)):

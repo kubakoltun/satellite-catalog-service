@@ -1,14 +1,11 @@
-"""Model domenowy STAC Item.
+"""Domain model for a STAC Item
 
-Celowo NIE trzymamy tu klasy domenowej innej niż `dict` - STAC Item to
-z definicji dokument GeoJSON, a `stac-pydantic` daje nam gotową, zgodną ze
-specyfikacją walidację (`validate_stac_item`). Zamiast pisać własną warstwę
-encji domenowej, wykorzystujemy `Item` z tej biblioteki jako "wyrocznię"
-poprawności - parser buduje zwykły dict (żeby był trywialny do testowania
-i logowania), a walidacja jest osobnym, jawnym krokiem.
-
-To jest miejsce, w którym w przyszłości (Krok 2) repozytorium pgSTAC
-będzie oczekiwać danych wejściowych - kontrakt parserów kończy się tutaj.
+Deliberately, I do not introduce a separate domain class here: a STAC Item
+is a GeoJSON Feature, and `stac-pydantic` provides ready-made validation
+(`validate_stac_item`). Instead of introducing my own domain entity layer,
+I am using `Item` from the library as the validation authority.
+The parser builds a regular Python dictionary so that it is easy to test
+and log, while validation remains a separate, explicit step.
 """
 
 from __future__ import annotations
@@ -19,7 +16,8 @@ from stac_pydantic import Item
 
 STAC_VERSION = "1.0.0"
 
-# Typ dla czytelności sygnatur - STAC Item to zwykły dict zgodny ze schematem GeoJSON Feature.
+# Readability type alias - a STAC Item is a regular dict
+# conforming to the GeoJSON Feature structure
 STACItemDict = dict[str, Any]
 
 
@@ -33,12 +31,11 @@ def build_stac_item(
     assets: dict,
     stac_extensions: list[str],
 ) -> STACItemDict:
-    """Składa surowy dict STAC Item z gotowych już fragmentów.
+    """Build a raw STAC Item dictionary from the provided components
 
-    Funkcja jest celowo "głupia" - nie zna specyfiki żadnego dostawcy,
-    tylko układa podane części w kształt zgodny ze STAC. Cała wiedza
-    o tym, *skąd* wziąć poszczególne wartości, żyje w parserach
-    (`ingestion/parsers/*`), nie tutaj.
+    The function is intentionally provider-agnostic: it does not contain
+    any provider-specific logic and only assembles the supplied components
+    into a structure conforming to the STAC specification.
     """
     return {
         "type": "Feature",
@@ -55,13 +52,15 @@ def build_stac_item(
 
 
 def validate_stac_item(item: STACItemDict) -> STACItemDict:
-    """Waliduje dict względem specyfikacji STAC 1.0.0 (przez stac-pydantic).
+    """Validate the dictionary against the STAC 1.0.0 specification\
 
-    Zwraca ten sam dict bez zmian, jeśli jest poprawny - podnosi
-    `pydantic.ValidationError` w przeciwnym razie. Rozdzielenie budowy
-    (`build_stac_item`) od walidacji jest świadome: parser zawsze
-    produkuje *jakiś* dict, nawet gdy dane wejściowe są wątpliwe, a to
-    właśnie walidacja decyduje, czy trafi on dalej, czy do dead-letter.
+    Returns the dictionary unchanged if validation succeeds.
+    Raises `pydantic.ValidationError` if validation fails.
+
+    Building (`build_stac_item`) and validation are intentionally separate:
+    the parser always produces a dictionary, even when the input data is
+    questionable. Validation determines whether the item continues through
+    the pipeline or is sent to the dead-letter queue.
     """
     Item.model_validate(item)
     return item

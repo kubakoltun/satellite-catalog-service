@@ -14,8 +14,8 @@ def fake_repository() -> FakeCatalogRepository:
 
 @pytest.fixture
 def client(fake_repository: FakeCatalogRepository) -> TestClient:
-    # Świadomie NIE używamy `main.app` - ten wymaga realnej bazy w swoim
-    # `lifespan`. Montujemy tylko router `/search` na osobnej, minimalnej
+    # Świadomie nie używam `main.app` - ten wymaga realnej bazy w swoim
+    # `lifespan`. Montuję tylko router `/search` na osobnej, minimalnej
     # aplikacji testowej z podmienionym repozytorium (dependency_overrides).
     app = FastAPI()
     app.include_router(search_router)

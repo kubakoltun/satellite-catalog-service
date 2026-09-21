@@ -26,21 +26,21 @@ router = APIRouter(tags=["search"])
 @router.get("/search")
 async def search(
     bbox: str | None = Query(
-        None, description="minLon,minLat,maxLon,maxLat (WGS84), ex. 20.9,52.1,21.3,52.4"
+        None, description="minLon,minLat,maxLon,maxLat (WGS84), e.g. 20.9,52.1,21.3,52.4"
     ),
     datetime: str | None = Query(
         None,
         alias="datetime",
-        description="RFC3339 instant or interval start/end, ex. 2026-08-01T00:00:00Z/2026-09-01T00:00:00Z",
+        description="RFC3339 instant or interval start/end, e.g. 2026-08-01T00:00:00Z/2026-09-01T00:00:00Z",
     ),
     collections: str | None = Query(
-        None, description="collection list separated by comma, ex. SKY_SHIELD,SPACE_EYE"
+        None, description="collection list separated by comma, e.g. SKY_SHIELD,SPACE_EYE"
     ),
     max_cloud_cover: float | None = Query(
         None, ge=0, le=100, description="max eo:cloud_cover in percent"
     ),
     processing_level: str | None = Query(
-        None, description="exact processing:level, ex. L2A"
+        None, description="exact processing:level, e.g. L2A"
     ),
     limit: int = Query(10, ge=1, le=1000),
     repository: CatalogRepositoryPort = Depends(get_repository),

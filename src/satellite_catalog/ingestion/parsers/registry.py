@@ -1,10 +1,6 @@
-"""Rejestr parserów - mapuje `Mission` na implementację `ParserPort`.
+"""Parsers registry - maps `Mission` to a `ParserPort` implementation
 
-To jest jedyne miejsce w kodzie, które "wie", że istnieją dwaj różni
-dostawcy. `ingestion/service.py` (Krok 4) będzie pytał wyłącznie ten
-rejestr - nigdy nie zobaczy `if mission == Mission.SKY_SHIELD`.
-Dodanie trzeciego dostawcy to nowy wpis tutaj + nowy plik parsera,
-zero zmian gdziekolwiek indziej.
+This is the only place that "knows" about the different providers.
 """
 
 from __future__ import annotations
@@ -32,11 +28,11 @@ _REGISTRY: dict[Mission, _ParserEntry] = {
 
 
 def get_parser(mission: Mission) -> Callable[[bytes | str], STACItemDict]:
-    """Zwraca funkcję parsującą dla podanej misji.
+    """Returns a parsing function for the given mission
 
-    Podnosi `UnsupportedMissionError`, jeśli nikt się dla tej misji
-    nie zarejestrował - to ma być jawny, czytelny błąd 4xx na warstwie
-    API (Krok 4), nie KeyError gdzieś w głębi stosu.
+    Raises `UnsupportedMissionError` if no parser is registered
+    for the given mission. This allows the API layer to return
+    a clear 4xx error.
     """
     entry = _REGISTRY.get(mission)
     if entry is None:

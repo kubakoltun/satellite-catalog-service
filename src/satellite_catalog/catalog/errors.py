@@ -3,12 +3,12 @@ class CatalogError(Exception):
 
 
 class ItemPersistenceError(CatalogError):
-    """Saving an Item to the catalog did not succeede (data basse error)."""
+    """Saving an Item to the catalog did not succeed (database error)."""
 
 
 class CollectionPersistenceError(CatalogError):
-    """Saving/registering Collection in the catalog did not succeede."""
+    """Saving/registering a Collection in the catalog did not succeed."""
 
 
 class SearchError(CatalogError):
-    """Searchin the catalog did not succeede (data basse error)."""
+    """Searching the catalog did not succeed (database error)."""

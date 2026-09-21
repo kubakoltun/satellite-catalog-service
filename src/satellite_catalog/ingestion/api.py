@@ -1,22 +1,20 @@
-"""Endpoint `POST /ingest/{mission}` - warstwa przyjęcia danych.
+"""Endpoint POST /ingest/{mission}
 
-Decyzja architektoniczna (świadomie, zgodnie z wcześniejszym planem):
-**sync accept + BackgroundTasks**, bez zewnętrznego brokera.
+The endpoint only reads the raw request body (JSON or XML, depending on
+the mission), schedules the processing as a background task, and
+immediately returns 202 Accepted. Parsing and database persistence
+happen after the request has been accepted, so the ground segment does
+not have to wait for database persistence before receiving an
+acknowledgement.
 
-- Endpoint tylko czyta surowe body (JSON albo XML - zależnie od misji),
-  planuje przetwarzanie w tle i **natychmiast** zwraca `202 Accepted`.
-  Realne parsowanie + zapis do bazy dzieje się już poza cyklem
-  request/response - to jest odpowiedź na wymaganie "dane przychodzą
-  burstami": klient (segment naziemny) nie czeka na zapis do bazy,
-  żeby dostać potwierdzenie przyjęcia.
-- Błędy parsowania/walidacji/zapisu są łapane i logowane w tle - endpoint
-  ich nie zwraca synchronicznie. To jest świadomy kompromis: prostszy
-  i wystarczający do tego zadania, kosztem natychmiastowego feedbacku
-  o błędzie dla klienta. W realnym systemie produkcyjnym to miejsce,
-  w którym dokłada się broker (RabbitMQ/Kafka) + dead-letter queue +
-  endpoint statusu ingestion (`GET /ingest/{id}`), żeby błąd dało się
-  zaobserwować bez grzebania w logach - celowo pominięte w tym MVP,
-  żeby nie budować infrastruktury, zanim jest ku temu jasna potrzeba.
+Parsing, validation, and persistence errors are caught and logged in the
+background task rather than returned synchronously by the endpoint.
+This is a deliberate trade-off: the implementation is simpler and
+sufficient for the current requirements, but the client does not receive
+immediate feedback when processing fails. 
+TODO In a production system, this could be replaced with a durable message broker,
+a dead-letter queue, and an ingestion-status endpoint such as
+GET /ingest/{id}. These components are intentionally omitted so far.
 """
 
 from __future__ import annotations
@@ -47,7 +45,7 @@ async def ingest(
 ) -> dict:
     raw = await request.body()
     if not raw:
-        raise HTTPException(status_code=400, detail="Puste body żądania")
+        raise HTTPException(status_code=400, detail="Request body is empty")
 
     service = IngestionService(repository)
     background_tasks.add_task(_process_in_background, service, mission, raw)
@@ -61,14 +59,14 @@ async def _process_in_background(
     try:
         item = await service.ingest(mission, raw)
     except ParsingError as exc:
-        logger.error("Błąd parsowania metadanych (misja=%s): %s", mission.value, exc)
+        logger.error("Metadata parsing error (mission=%s): %s", mission.value, exc)
     except ValidationError as exc:
         logger.error(
-            "Wynikowy STAC Item niezgodny ze specyfikacją (misja=%s): %s", mission.value, exc
+            "Resulting STAC Item does not conform to the specification (mission=%s): %s", mission.value, exc
         )
     except CatalogError as exc:
-        logger.error("Błąd zapisu do katalogu (misja=%s): %s", mission.value, exc)
-    except Exception:  # noqa: BLE001 - ostatnia linia obrony w tle, ma trafić do logów, nie ubić workera
-        logger.exception("Nieoczekiwany błąd podczas ingestion (misja=%s)", mission.value)
+        logger.error("Catalog persistence error (mission=%s): %s", mission.value, exc)
+    except Exception:  # noqa: BLE001 - last-resort safeguard for background processing
+        logger.exception("Unexpected error during ingestion (mission=%s)", mission.value)
     else:
-        logger.info("Zaingestowano item '%s' (misja=%s)", item["id"], mission.value)
+        logger.info("Ingested item '%s' (mission=%s)", item["id"], mission.value)

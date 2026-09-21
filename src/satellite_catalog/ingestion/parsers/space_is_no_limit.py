@@ -1,11 +1,13 @@
-"""Parser metadanych SPACE_EYE (dostawca: SpaceIsNoLimit, format: XML).
+"""Metadata parser (provider: SpaceIsNoLimit, format: XML)
 
-Dwie rzeczy odróżniają ten parser od SKY_SHIELD:
-1. Geometria (`FootprintWKT`) jest w UTM (EPSG:32634) - wymaga realnej
-   reprojekcji do WGS84, nie tylko przepisania współrzędnych.
-2. Czas jest podany jako interwał (`StartTimeUTC`/`StopTimeUTC`), nie
-   pojedynczy moment - mapujemy na `start_datetime`/`end_datetime`
-   z `datetime=None`, zgodnie ze specyfikacją STAC Common Metadata.
+The provider metadata requires two transformations:
+1. Geometry (`FootprintWKT`) is provided in UTM (EPSG:32634) and must be
+   reprojected to WGS84.
+2. Time is provided as an interval (`StartTimeUTC`/`StopTimeUTC`), so I map it
+   to `start_datetime`/`end_datetime` and set `datetime=None`, as required
+   by the STAC Common Metadata specification.
+
+I also map the remaining provider fields and build the STAC Item.
 """
 
 from __future__ import annotations
@@ -39,7 +41,7 @@ _NS = {"se": "http://spaceisnolimit.com/schemas/metadata/v2"}
 
 
 def parse_space_is_no_limit(raw: bytes | str) -> STACItemDict:
-    """Mapuje surowy XML SPACE_EYE na zwalidowany STAC Item."""
+    """Map raw XML SpaceIsNoLimit to validated STAC Item."""
     root = _load_xml(raw)
 
     granule_id = _required_text(root, "se:HeaderInfo/se:GranuleID")
@@ -59,11 +61,13 @@ def parse_space_is_no_limit(raw: bytes | str) -> STACItemDict:
     source_crs = _required_text(root, "se:GeometricProperties/se:CRS")
     footprint_wkt = _required_text(root, "se:GeometricProperties/se:FootprintWKT")
 
+    mission = Mission(mission_name) # Validate against the catalog's supported missions
+
     try:
         geometry = reproject_wkt_to_wgs84(footprint_wkt, source_crs)
-    except Exception as exc:  # noqa: BLE001 - opakowujemy w jeden czytelny błąd domenowy
+    except Exception as exc:  # noqa: BLE001 - wrap any reprojection error in a domain-specific error
         raise ParsingError(
-            f"Nie udało się przeliczyć FootprintWKT ({source_crs} -> EPSG:4326): {exc}"
+            f"Could not calculate FootprintWKT ({source_crs} -> EPSG:4326): {exc}"
         ) from exc
 
     bbox = bbox_from_geometry(geometry)
@@ -74,20 +78,21 @@ def parse_space_is_no_limit(raw: bytes | str) -> STACItemDict:
         "start_datetime": start_datetime,
         "end_datetime": end_datetime,
         "platform": spacecraft_id,
-        "mission": mission_name,
+        "mission": mission.value,
         "providers": [{"name": provider, "roles": ["producer"]}],
         **processing_properties(processing_level),
         **eo_properties(cloud_cover),
-        # DataQualityStatus nie ma odpowiednika w oficjalnym rozszerzeniu
-        # STAC - custom property w namespace dostawcy.
-        "spaceeye:data_quality_status": quality_status,
+
+        # `DataQualityStatus` has no corresponding STAC extension property,
+        # so I preserve it as a custom property in the provider namespace.
+        "spaceisnolimit:data_quality_status": quality_status,
     }
 
     assets = _extract_assets(root)
 
     item = build_stac_item(
         item_id=granule_id,
-        collection=Mission.SPACE_EYE.value,
+        collection=mission.value,
         geometry=geometry,
         bbox=bbox,
         properties=properties,
@@ -103,13 +108,13 @@ def _load_xml(raw: bytes | str) -> etree._Element:
     try:
         return etree.fromstring(raw)
     except etree.XMLSyntaxError as exc:
-        raise ParsingError(f"Niepoprawny XML w metadanych SPACE_EYE: {exc}") from exc
+        raise ParsingError(f"Invalid XML in SpaceIsNoLimit metadata: {exc}") from exc
 
 
 def _required_text(element: etree._Element, xpath: str) -> str:
     value = element.findtext(xpath, namespaces=_NS)
     if value is None or not value.strip():
-        raise ParsingError(f"Brakujący lub pusty węzeł '{xpath}' w metadanych SPACE_EYE")
+        raise ParsingError(f"Missing or empty node '{xpath}' in SpaceIsNoLimit metadata")
     return value.strip()
 
 
@@ -120,7 +125,7 @@ def _extract_assets(root: etree._Element) -> dict:
         name = band.get("name")
         href = band.findtext("se:URL", namespaces=_NS)
         if name is None or href is None:
-            raise ParsingError("Niepełny wpis <Band> w RasterFiles (brak name/URL)")
+            raise ParsingError("Incomplete <Band> entry in RasterFiles (missing name or URL)")
 
         asset: dict = {
             "href": href,
@@ -154,10 +159,12 @@ def _extract_assets(root: etree._Element) -> dict:
 def _warn_if_global_bbox_inconsistent(
     root: etree._Element, *, computed_bbox: tuple[float, float, float, float]
 ) -> None:
-    """Miękka walidacja: `GlobalBBOX` to redundantne pole dostawcy - może
-    się rozjechać z `FootprintWKT` (obserwowane realnie w próbce SPACE_EYE).
-    Logujemy ostrzeżenie, ale to `FootprintWKT` jest źródłem prawdy dla
-    faktycznego zasięgu produktu, więc NIGDY nie blokujemy na tej podstawie.
+    """Perform a soft consistency check of the provider-supplied GlobalBBOX
+
+    `GlobalBBOX` is redundant with `FootprintWKT` and may differ from the
+    footprint. I log a warning when the two values do not match, but I use
+    the reprojected `FootprintWKT` as the source of truth for the product
+    extent and never reject the product based on `GlobalBBOX` alone.
     """
     bbox_el = root.find("se:GeometricProperties/se:GlobalBBOX", _NS)
     if bbox_el is None:
@@ -171,12 +178,15 @@ def _warn_if_global_bbox_inconsistent(
             float(bbox_el.findtext("se:NorthBoundLatitude", namespaces=_NS)),
         )
     except (TypeError, ValueError):
-        return  # niepełny/niepoprawny GlobalBBOX - pomijamy sanity-check, to i tak pole pomocnicze
+        # Invalid or incomplete GlobalBBOX - skip the sanity check because
+        # this is only a supplementary provider field.
+        return
 
     if not bbox_matches(computed_bbox, reference_bbox, tolerance_deg=0.05):
         logger.warning(
-            "GlobalBBOX z metadanych (%s) nie zgadza się z bboxem policzonym "
-            "z FootprintWKT po reprojekcji (%s) - używam FootprintWKT jako źródła prawdy",
+            "GlobalBBOX from metadata (%s) does not match the bbox calculated "
+            "from FootprintWKT after reprojection (%s) - using FootprintWKT "
+            "as the source of truth",
             reference_bbox,
             computed_bbox,
         )

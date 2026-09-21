@@ -14,33 +14,34 @@ logger = logging.getLogger("satellite_catalog")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Pula połączeń tworzona raz przy starcie aplikacji, nie per-request -
-    # to jedyne miejsce w Kroku 0, gdzie "coś" trwale żyje obok requestów.
+    # Connection pool created once on app startup, not per request.
+    # It is the only place where something persists across requests.
     await create_pool()
-    logger.info("Połączono z bazą danych.")
+    logger.info("Connected to the database.")
 
-    # Repozytorium tworzone raz i trzymane w app.state - endpointy
-    # (search_router, ingestion_router) pobierają je przez Depends(get_repository)
-    # (satellite_catalog.deps), nigdy nie importując PgstacRepository wprost.
+    # Repository created once and stored in app.state.
+    # Endpoints (search_router, ingestion_router) get it through
+    # Depends(get_repository) (satellite_catalog.deps), so they never
+    # import PgstacRepository directly.
     repository = PgstacRepository(get_pool())
     app.state.repository = repository
 
-    # Obie kolekcje (SKY_SHIELD, SPACE_EYE) muszą istnieć w pgSTAC, zanim
-    # jakikolwiek Item będzie mógł zostać zapisany (klucz obcy). Rejestracja
-    # jest idempotentna (upsert), więc bezpieczna przy każdym starcie.
+    # Collections must exist in pgSTAC before any Item can be inserted
+    # because of the foreign key constraint. Registration is idempotent
+    # (upsert), so it is safe to run on every application startup.
     for collection in default_collections():
         await repository.ensure_collection(collection)
-    logger.info("Kolekcje STAC zarejestrowane.")
+    logger.info("STAC collection registered.")
 
     yield
     await close_pool()
-    logger.info("Zamknięto połączenie z bazą danych.")
+    logger.info("Closed the database connection.")
 
 
 app = FastAPI(
     title="Satellite Catalog Service",
     description="Mikroserwis STAC do przyjmowania i przeszukiwania metadanych zobrazowań satelitarnych.",
-    version="0.1.0",
+    version="1.0.0",
     lifespan=lifespan,
 )
 
@@ -50,15 +51,15 @@ app.include_router(search_router)
 
 @app.get("/health", tags=["system"])
 async def health() -> dict[str, str]:
-    """Sprawdza, czy aplikacja żyje ORAZ czy ma realne połączenie z bazą.
+    """Check whether the app is up and the database is reachable
 
-    Celowo nie jest to statyczne {"status": "ok"} - sens Kroku 0 to
-    zweryfikowanie całej rury (app <-> Postgres/pgSTAC), nie samego procesu.
+    The purpose of the health check is to verify the entire pipeline
+    (app <-> Postgres/pgSTAC).
     """
     try:
         await check_connection()
-    except Exception as exc:  # noqa: BLE001 - health check ma łapać wszystko
-        logger.exception("Health check nie powiódł się")
+    except Exception as exc:  # noqa: BLE001 - health check should catch all
+        logger.exception("Health check did not succeed")
         raise HTTPException(status_code=503, detail=f"Database unavailable: {exc}") from exc
 
     return {"status": "ok", "database": "reachable"}

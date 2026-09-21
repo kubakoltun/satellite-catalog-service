@@ -1,7 +1,6 @@
-"""Orkiestracja ingestion: wybór parsera (Krok 1) -> zapis (Krok 2).
+"""Orchestrates ingestion: selecting the appropriate parser -> saving the result
 
-To jest jedyne miejsce, które spina te dwie warstwy. Warstwa API (`api.py`)
-nie wie nic o parserach ani o repozytorium - tylko o tym serwisie.
+This is the only place that connects these two layers.
 """
 
 from __future__ import annotations
@@ -17,13 +16,13 @@ class IngestionService:
         self._repository = repository
 
     async def ingest(self, mission: Mission, raw: bytes) -> STACItemDict:
-        """Parsuje surowe metadane i zapisuje wynikowy STAC Item.
+        """Parses raw metadata and saves the resulting STAC Item
 
-        Podnosi (bez łapania - to decyzja wywołującego, jak je obsłużyć):
-        - `UnsupportedMissionError` - brak parsera dla danej misji,
-        - `ParsingError` - surowe dane strukturalnie niepoprawne,
-        - `pydantic.ValidationError` - wynikowy Item niezgodny ze spec STAC,
-        - `CatalogError` (i podklasy) - zapis do bazy się nie powiódł.
+        It raises:
+        - `UnsupportedMissionError` - no parser is available for the given mission
+        - `ParsingError` - raw data is structurally invalid
+        - `pydantic.ValidationError` - the resulting Item does not conform to the STAC specification
+        - `CatalogError` (and subclasses) - saving the item to the database failed
         """
         parser = get_parser(mission)
         item = parser(raw)

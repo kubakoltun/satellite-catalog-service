@@ -1,9 +1,12 @@
-"""Implementation of `CatalogRepositoryPort` based on pgSTAC SQL functions.
+"""Implementation of `CatalogRepositoryPort` based on pgSTAC SQL functions
 
-We deliberately do not write raw SQL that operates directly on the `pgstac.items`/`pgstac.collections` tables, 
-as they are partitioned and have non-trivial internal logic, 
-including automatic time-based partitioning and triggers that maintain indexes. 
-Instead, we use the official SQL functions provided by pgSTAC in the 'pgstac' schema.
+I deliberately do not write raw SQL that operates directly on the
+`pgstac.items` and `pgstac.collections` tables because they are partitioned
+and have non-trivial internal logic, including automatic time-based
+partitioning and triggers that maintain indexes.
+
+Instead, I use the official SQL functions provided by pgSTAC in the
+pgstac schema.
 """
 
 from __future__ import annotations

@@ -1,11 +1,11 @@
-"""Zależności FastAPI (Depends) - cienka warstwa DI.
+"""FastAPI Dependencies (Depends) - thin DI layer
 
-Repozytorium jest tworzone raz w `main.py` (`lifespan`) i trzymane w
-`app.state`. Endpointy pobierają je przez tę funkcję zamiast importować
-`PgstacRepository` bezpośrednio - dzięki temu routery zależą tylko od
-`CatalogRepositoryPort` (DIP), nie od tego, że pod spodem jest akurat
-pgSTAC. W testach jednostkowych ta funkcja jest podmieniana przez
-`app.dependency_overrides` na fake repozytorium - zero realnej bazy.
+The repository is created once in main.py (lifespan) and stored in app.state.
+Endpoints get it through this function instead of importing `PgstacRepository` directly.
+This keeps the routers dependent only on the `CatalogRepositoryPort` abstraction,
+rather than on the specific pgSTAC implementation underneath.
+In unit tests, I can replace this dependency with a fake repository using
+`app.dependency_overrides` - no real database is needed.
 """
 
 from fastapi import Request

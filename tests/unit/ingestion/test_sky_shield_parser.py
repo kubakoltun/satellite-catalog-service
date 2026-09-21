@@ -57,9 +57,9 @@ def test_keeps_non_standard_fields_as_custom_properties(raw_sky_shield: str) -> 
     item = parse_sky_is_no_limit(raw_sky_shield)
     props = item["properties"]
 
-    assert props["skyshield:snow_cover_percentage"] == 0.0
-    assert props["skyshield:orbit_path"] == 142
-    assert props["skyshield:orbit_row"] == 33
+    assert props["skyisnolimit:snow_cover_percentage"] == 0.0
+    assert props["skyisnolimit:orbit_path"] == 142
+    assert props["skyisnolimit:orbit_row"] == 33
 
 
 def test_datetime_is_a_single_instant(raw_sky_shield: str) -> None:

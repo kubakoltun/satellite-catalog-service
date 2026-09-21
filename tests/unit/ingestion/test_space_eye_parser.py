@@ -79,7 +79,7 @@ def test_maps_eo_and_processing_extensions(raw_space_eye: str) -> None:
 
 def test_keeps_data_quality_status_as_custom_property(raw_space_eye: str) -> None:
     item = parse_space_is_no_limit(raw_space_eye)
-    assert item["properties"]["spaceeye:data_quality_status"] == "PASSED"
+    assert item["properties"]["spaceisnolimit:data_quality_status"] == "PASSED"
 
 
 def test_assets_include_bands_and_overview(raw_space_eye: str) -> None:

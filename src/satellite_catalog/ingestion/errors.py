@@ -1,16 +1,18 @@
 class IngestionError(Exception):
-    """Bazowy wyjątek dla wszystkich błędów warstwy ingestion."""
+    """Base exception for every erros of ingestion layer."""
 
 
 class UnsupportedMissionError(IngestionError):
-    """Brak zarejestrowanego parsera dla podanej misji."""
+    """No registered parser for given mission."""
 
 
 class ParsingError(IngestionError):
-    """Surowe dane nie dają się poprawnie zmapować na STAC Item.
+    """Raw data could not be mapped to a STAC Item
 
-    Odróżniamy to od `ValidationError` z pydantic/stac-pydantic - tu
-    chodzi o problem na etapie odczytu/ekstrakcji pól z surowych danych
-    (np. brakujący węzeł XML), nie o niezgodność wynikowego Itemu ze
-    specyfikacją STAC (to zgłasza już `stac_models.validate_stac_item`).
+    I use `ParsingError` for problems that occur while reading or extracting
+    fields from raw data, such as a missing XML node or path.
+
+    This differs from `ValidationError` from `stac-pydantic`, which indicates
+    that the resulting STAC Item does not conform to the STAC specification.
+    Validation is handled by `stac_models.validate_stac_item`.
     """

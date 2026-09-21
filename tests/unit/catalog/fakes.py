@@ -1,8 +1,7 @@
 """Lekkie podstawki (test doubles) pod asyncpg - bez realnej bazy danych.
 
-Nie próbujemy tu mockować całego `asyncpg`, tylko dokładnie ten wąski
-wycinek API, którego używa `PgstacRepository`: `pool.acquire()` jako
-async context manager i `conn.execute(sql, *args)`. To pozwala
+Próbuję mockować tylko wąski wycinek API, którego używa `PgstacRepository`: `pool.acquire()` 
+jako async context manager i `conn.execute(sql, *args)`. To pozwala
 przetestować logikę repozytorium (jakie zapytanie leci, jak wygląda
 payload, jak mapowane są błędy) bez podnoszenia Postgresa - realny zapis
 do pgSTAC sprawdza dopiero test integracyjny (`tests/integration/`).

@@ -2,10 +2,8 @@ import asyncpg
 
 from satellite_catalog.settings import settings
 
-# Pula połączeń trzymana jako stan modułu, tworzona/zamykana w lifespanie
-# aplikacji FastAPI (main.py). Prostota na Kroku 0 - jeśli w przyszłości
-# będzie potrzeba łatwiejszego mockowania w testach, przeniesiemy to na
-# app.state.
+# The connection pool is kept as module-level state. It is created and closed
+# during the FastAPI application lifespan.
 _pool: asyncpg.Pool | None = None
 
 
@@ -16,6 +14,8 @@ async def create_pool() -> asyncpg.Pool:
         min_size=1,
         max_size=5,
         server_settings={
+            # The default search_path can cause issues during the first startup.
+            # If it does not include pgstac, the service cannot use its functions.
             "search_path": settings.database_search_path
         }
     )
@@ -32,16 +32,15 @@ async def close_pool() -> None:
 def get_pool() -> asyncpg.Pool:
     if _pool is None:
         raise RuntimeError(
-            "Pula połączeń nie została zainicjalizowana - "
-            "sprawdź lifespan aplikacji w main.py"
+            "Connection pool was not initialized - check the application lifespan configuration in main.py"
         )
     return _pool
 
 
 async def check_connection() -> None:
-    """Wykonuje realne zapytanie do bazy - używane przez /health."""
+    """Performs a simple query against the database - used by the `/health` endpoint."""
     pool = get_pool()
     async with pool.acquire() as conn:
         result = await conn.fetchval("SELECT 1;")
         if result != 1:
-            raise RuntimeError("Nieoczekiwana odpowiedź z bazy danych")
+            raise RuntimeError("Unexpected answer from the database")

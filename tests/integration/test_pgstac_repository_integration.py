@@ -1,19 +1,13 @@
-"""Test integracyjny `PgstacRepository` na REALNYM Postgresie+pgSTAC.
+"""Test integracyjny `PgstacRepository` na realnym Postgresie+pgSTAC.
 
-WYMAGA DOCKERA. Nie jest częścią domyślnego `pytest` (patrz `pytest.ini_options`
+Wymaga dockera. Nie jest częścią domyślnego `pytest` (`pytest.ini_options`)
 w pyproject.toml - testy integracyjne trzeba włączyć jawnie):
 
     pip install -e ".[dev,integration]"
     pytest tests/integration -v -m integration
 
 `testcontainers` samo podniesie i zamknie kontener z obrazem
-`ghcr.io/stac-utils/pgstac`, uruchomi `pypgstac migrate`, a na koniec
-posprząta - nie trzeba wcześniej odpalać `docker-compose.yml`.
-
-Uwaga uczciwości: ten plik NIE został uruchomiony w środowisku, w którym
-go napisałem (brak Docker Daemon w tym sandboxie) - w przeciwieństwie do
-testów jednostkowych w `tests/unit/`, które realnie przeszły. Uruchom go
-u siebie jako pierwszą rzeczywistą weryfikację całej ścieżki zapisu.
+`ghcr.io/stac-utils/pgstac`, uruchomi `pypgstac migrate`, a na koniec posprząta.
 """
 
 from __future__ import annotations
@@ -82,7 +76,7 @@ async def test_save_item_persists_to_pgstac(pool: asyncpg.Pool) -> None:
 
 
 async def test_save_item_is_idempotent(pool: asyncpg.Pool) -> None:
-    """Wymaganie F7: ponowne przesłanie tego samego produktu nie tworzy duplikatu."""
+    """Ponowne przesłanie tego samego produktu nie tworzy duplikatu."""
     repo = PgstacRepository(pool)
     await repo.ensure_collection(build_collection(Mission.SKY_SHIELD))
 
@@ -99,8 +93,8 @@ async def test_save_item_is_idempotent(pool: asyncpg.Pool) -> None:
 
 
 async def test_search_finds_saved_item_by_bbox_and_cloud_cover(pool: asyncpg.Pool) -> None:
-    """Pełna ścieżka Kroku 2 + Kroku 3: zapisany Item musi dać się znaleźć
-    przez /search - bbox obejmujący scenę i eo:cloud_cover <= wartość ze sceny."""
+    """Zapisany Item musi dać się znaleźć przez /search - 
+    bbox obejmujący scenę i eo:cloud_cover <= wartość ze sceny."""
     repo = PgstacRepository(pool)
     await repo.ensure_collection(build_collection(Mission.SKY_SHIELD))
 

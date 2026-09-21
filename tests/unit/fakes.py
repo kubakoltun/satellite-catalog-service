@@ -1,8 +1,9 @@
 """Fake `CatalogRepositoryPort` - do testów API i warstwy orkiestracji
 (ingestion/search) bez dotykania prawdziwej bazy ani nawet asyncpg.
 
-Odróżnij to od `tests/unit/catalog/fakes.py` (`FakeConnection`/`FakePool`),
+Różne od `tests/unit/catalog/fakes.py` (`FakeConnection`/`FakePool`),
 które udają asyncpg na potrzeby testowania samej `PgstacRepository`.
+
 Ten fake jest jeden poziom wyżej - udaje cały port `CatalogRepositoryPort`.
 """
 
