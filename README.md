@@ -31,6 +31,8 @@ Compose podnosi trzy serwisy w kolejności zależności:
 
 - `postgres` - obraz `ghcr.io/stac-utils/pgstac` (PostGIS + rozszerzenia dla pgSTAC).
 - `pgstac-migrate` - jednorazowo ładuje schemat pgSTAC (`pypgstac migrate`), kończy się i wychodzi.
+- `rabbitmq` - broker wiadomości. Przechowuje surowe payloady wysłane na `/ingest/{mission}` w trwałej kolejce (`ingestion.raw.q`) do czasu przetworzenia przez `worker`
+- `worker` - osobny proces konsumujący `ingestion.raw.q`: parsuje surowe metadane do STAC Item i zapisuje w pgSTAC. Potwierdza wiadomość (`ack`) dopiero po udanym zapisie; błędne dane trafiają do DLQ
 - `app` - startuje dopiero, gdy `postgres` jest zdrowy, a migracja zakończyła się sukcesem. Przy starcie rejestruje kolekcje `SKY_SHIELD`/`SPACE_EYE` w pgSTAC.
 
 ### 3. Sprawdź, czy aplikacja działa
@@ -79,21 +81,38 @@ ItemCollection (`type: FeatureCollection`, `features: [...STAC Item]`, `links`).
 
 ## Testy
 
+### Mock "satelita"
+
+Serwis `mock-satellite` symuluje nadawanie danych: w losowych odstępach
+(5-30s) wysyła próbkę SKY_SHIELD lub SPACE_EYE na `POST /ingest/{mission}`.
+Jest opcjonalny (profil `mock`):
+
+```bash
+# skrypt wykonuje: docker compose --profile mock up --build
+./bin/mock_profile.sh
+```
+
+>Podgląd kolejek/DLQ: http://localhost:15672 (guest/guest).
+
+### Testy jednostkowe, bez Dockera
+
 ```bash
 pip install -e ".[dev]"
-pytest -v                          # 62 testy jednostkowe, bez Dockera, ~0.5s
+pytest -v                          
 ```
+
+### Testy na realnym Postgres+pgSTAC (testcontainers, wymaga Docker)
 
 ```bash
 pip install -e ".[dev,integration]"
-pytest -v -m integration           # testy na realnym Postgres+pgSTAC (testcontainers, wymaga Docker)
+pytest -v -m integration
 ```
 
 ## Struktura
 
 ```
 src/satellite_catalog/
-├── main.py                     # FastAPI app: /health, wiring routerów i repozytorium
+├── main.py                     # FastAPI app: /health, wiring routerów, repozytorium i kolejki
 ├── settings.py                 # konfiguracja z env (DATABASE_URL)
 ├── deps.py                     # Depends(get_repository) - DI dla routerów
 ├── db/
@@ -106,7 +125,10 @@ src/satellite_catalog/
 ├── ingestion/                   # przyjęcie i parsowanie
 │   ├── errors.py
 │   ├── service.py                 # IngestionService: parse -> save
-│   ├── api.py                     # POST /ingest/{mission}
+│   ├── api.py                     # POST /ingest/{mission} - publikuje do kolejki, zwraca 202
+│   ├── queue_port.py              # QueuePort (Protocol)
+│   ├── rabbitmq_queue.py          # implementacja QueuePort (aio-pika, topologia exchange/queue/DLQ)
+│   ├── worker.py                  # osobny proces: konsumuje kolejkę, wywołuje 
 │   └── parsers/
 │       ├── base.py                 # ParserPort (Strategy)
 │       ├── sky_is_no_limit.py
@@ -120,12 +142,26 @@ src/satellite_catalog/
     ├── search.py                  # budowa/walidacja query -> search body pgSTAC
     └── api.py                     # GET /search
 
+docker/
+├── app.Dockerfile
+├── worker.Dockerfile
+└── mock-satellite.Dockerfile
+
+bin/
+├── copy_env.sh
+├── mock_profile.sh
+├── start.sh
+└── stop.sh
+
+mock_satellite/
+└── sender.py                    # mock "satelity": losowo POST-uje próbki na /ingest/{mission}
+
 tests/
 ├── fixtures/                    # dostarczone próbki JSON/XML
-├── unit/                        # 62 testy, bez Dockera (pytest / domyślnie)
+├── unit/                        # testy, bez Dockera
 │   ├── ingestion/                 # parsery + IngestionService
 │   ├── catalog/                   # collections, search, repository (fake DB)
 │   └── api/                       # endpointy na fake repozytorium (FastAPI TestClient)
 └── integration/                 # testy na realnym Postgres+pgSTAC (testcontainers)
-    └── test_pgstac_repository_integration.py   # wymaga Docker, uruchom: pytest -m integration
+    └── test_pgstac_repository_integration.py   # wymaga Docker - pytest -m integration
 ```
